@@ -91,6 +91,13 @@ class ACMOJClient:
 
         return result
 
+    def submit_code(self, problem_id: int, language: str, code_text: str) -> Optional[Dict]:
+        data = {"language": language, "code": code_text}
+        result = self._make_request("POST", f"/problem/{problem_id}/submit", data=data)
+        if result and 'id' in result:
+            self._save_submission_id(result['id'])
+        return result
+
     def get_submission_detail(self, submission_id: int) -> Optional[Dict]:
         return self._make_request("GET", f"/submission/{submission_id}")
 
@@ -105,13 +112,19 @@ def main():
     
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # Submit C++ source file
-    submit_parser = subparsers.add_parser("submit", help="Submit a C++ source file")
+    # Submit source code (text)
+    submit_parser = subparsers.add_parser("submit", help="Submit a source code file (text)")
     submit_parser.add_argument("--problem-id", type=int, required=True, help="Problem ID")
     submit_parser.add_argument("--language", type=str, required=True,
                                help="Programming language (e.g., cpp, c, python)")
     submit_parser.add_argument("--code-file", type=str, required=True,
                                help="Path to the source code file")
+
+    # Submit current git repository by URL
+    submit_git_parser = subparsers.add_parser("submit-git", help="Submit repository via Git URL")
+    submit_git_parser.add_argument("--problem-id", type=int, required=True, help="Problem ID")
+    submit_git_parser.add_argument("--git-url", type=str, required=False,
+                                   help="Git repository URL (defaults to origin remote)")
 
     # Sub-command for checking submission status
     status_parser = subparsers.add_parser("status", help="Check submission status")
@@ -139,8 +152,22 @@ def main():
         except Exception as e:
             print(f"Error: Failed to read code file: {e}")
             exit(1)
-
         result = client.submit_code(args.problem_id, args.language, code_text)
+
+    elif args.command == "submit-git":
+        git_url = args.git_url
+        if not git_url:
+            # Try to get origin URL
+            try:
+                import subprocess
+                git_url = subprocess.check_output(["git", "config", "--get", "remote.origin.url"],
+                                                  text=True).strip()
+            except Exception:
+                git_url = None
+        if not git_url:
+            print("Error: Git URL not provided and failed to auto-detect from origin remote.")
+            exit(1)
+        result = client.submit_git(args.problem_id, git_url)
 
     elif args.command == "status":
         result = client.get_submission_detail(args.submission_id)
