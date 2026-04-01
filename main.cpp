@@ -112,9 +112,3 @@ public:
     iterator begin() { return iterator(head); }
     iterator end() { return iterator(nullptr); }
 };
-
-int main() {
-    // No I/O. Acts as library; judge will run its own tests.
-    return 0;
-}
-
